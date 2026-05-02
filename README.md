@@ -93,9 +93,9 @@ voice-note-ai/
 ├── app.py                    # Streamlit web app
 ├── record_and_transcribe.py  # CLI recorder workflow
 ├── transcribe_file.py        # Transcribe and process existing audio files
-├── intent_parser.py          # Groq-powered structured intent extraction
-├── note_summarizer.py        # Groq-powered summaries and action items
-├── voice_note_analyzer.py    # Combined intent + summary analysis for the app
+├── intent_parser.py          # Intent schema and normalization helpers
+├── note_summarizer.py        # Summary schema and normalization helpers
+├── voice_note_analyzer.py    # Combined Groq intent + summary analysis
 ├── text_utils.py             # Shared JSON and multilingual text helpers
 ├── groq_client.py            # Reused Groq client singleton
 ├── session_store.py          # Session ID and JSON saving helpers
@@ -188,13 +188,19 @@ python record_and_transcribe.py --once
 Transcribe and process an existing audio file:
 
 ```bash
-python transcribe_file.py path/to/audio.wav --parse-intent --summarize --save
+python transcribe_file.py path/to/audio.wav --analyze
 ```
 
 For Tamil-heavy audio, you can pass a Whisper language hint:
 
 ```bash
-python transcribe_file.py path/to/audio.wav --language ta --parse-intent --summarize --save
+python transcribe_file.py path/to/audio.wav --language ta --analyze
+```
+
+Analyze and save an existing audio file:
+
+```bash
+python transcribe_file.py path/to/audio.wav --save
 ```
 
 ---

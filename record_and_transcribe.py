@@ -5,10 +5,9 @@ import sounddevice as sd
 from dotenv import load_dotenv
 from scipy.io.wavfile import write
 
-from intent_parser import parse_intent, print_intent
-from note_summarizer import summarize_note
 from session_store import build_session_note, create_session_id, save_session_note
 from transcribe_file import DEFAULT_INITIAL_PROMPT, transcribe_audio
+from voice_note_analyzer import analyze_note
 
 
 def record_audio(output_path: Path, duration: float, sample_rate: int) -> None:
@@ -42,7 +41,7 @@ def print_note_output(
     print(transcript)
     print()
     print("Detected Intent:")
-    print_intent(intent_result)
+    print_json(intent_result)
     print()
     print("Summary:")
     print(summary_result["short_summary"])
@@ -65,6 +64,12 @@ def print_note_output(
     print(saved_path)
 
 
+def print_json(data: dict) -> None:
+    import json
+
+    print(json.dumps(data, indent=2, ensure_ascii=False))
+
+
 def process_recording(args: object) -> None:
     outputs_dir = Path(args.outputs_dir)
     session_id = create_session_id(outputs_dir)
@@ -75,16 +80,15 @@ def process_recording(args: object) -> None:
     print("Transcribing...")
     transcript = transcribe_audio(audio_path, args.model, args.language, args.initial_prompt)
 
-    if args.skip_llm:
+    if not args.analyze:
         print("Transcript:")
         print(transcript)
         return
 
-    print("Extracting intent...")
-    intent_result = parse_intent(transcript, args.groq_model)
-
-    print("Summarizing...")
-    summary_result = summarize_note(transcript, intent_result, args.groq_model)
+    print("Analyzing...")
+    analysis = analyze_note(transcript, args.groq_model)
+    intent_result = analysis["intent"]
+    summary_result = analysis["summary"]
 
     session_note = build_session_note(
         session_id=session_id,
@@ -135,17 +139,29 @@ def main() -> None:
     parser.add_argument(
         "--groq-model",
         default=None,
-        help="Groq model to use for intent parsing. Defaults to GROQ_MODEL or llama-3.1-8b-instant.",
+        help="Groq model to use for analysis. Defaults to GROQ_MODEL or llama-3.1-8b-instant.",
+    )
+    parser.add_argument(
+        "--analyze",
+        action="store_true",
+        default=True,
+        help="Analyze transcript with Groq and save structured output. Enabled by default.",
+    )
+    parser.add_argument(
+        "--no-analyze",
+        action="store_false",
+        dest="analyze",
+        help="Only record and transcribe audio; do not call Groq.",
     )
     parser.add_argument(
         "--skip-intent",
         action="store_true",
-        help="Deprecated alias for --skip-llm.",
+        help="Deprecated alias for --no-analyze.",
     )
     parser.add_argument(
         "--skip-llm",
         action="store_true",
-        help="Only record and transcribe audio; do not call Groq.",
+        help="Deprecated alias for --no-analyze.",
     )
     parser.add_argument(
         "--outputs-dir",
@@ -159,7 +175,8 @@ def main() -> None:
     )
     args = parser.parse_args()
     load_dotenv()
-    args.skip_llm = args.skip_llm or args.skip_intent
+    if args.skip_llm or args.skip_intent:
+        args.analyze = False
 
     while True:
         process_recording(args)

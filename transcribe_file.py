@@ -4,9 +4,8 @@ from pathlib import Path
 import whisper
 from dotenv import load_dotenv
 
-from intent_parser import parse_intent, print_intent
-from note_summarizer import print_summary, summarize_note
 from session_store import build_session_note, create_session_id, save_session_note
+from voice_note_analyzer import analyze_note
 
 
 DEFAULT_INITIAL_PROMPT = (
@@ -47,6 +46,12 @@ def transcribe_audio(
     return result["text"].strip()
 
 
+def print_json(data: dict) -> None:
+    import json
+
+    print(json.dumps(data, indent=2, ensure_ascii=False))
+
+
 def main() -> None:
     parser = ArgumentParser(description="Transcribe an audio file with Whisper.")
     parser.add_argument("audio_file", help="Path to the audio file to transcribe.")
@@ -65,20 +70,11 @@ def main() -> None:
         default=DEFAULT_INITIAL_PROMPT,
         help="Optional Whisper prompt used to bias transcription for mixed-language voice notes.",
     )
-    parser.add_argument(
-        "--parse-intent",
-        action="store_true",
-        help="Send the transcript to Groq and print the universal intent object.",
-    )
-    parser.add_argument(
-        "--summarize",
-        action="store_true",
-        help="Create a structured summary note with Groq.",
-    )
+    parser.add_argument("--analyze", action="store_true", help="Analyze transcript with Groq.")
     parser.add_argument(
         "--save",
         action="store_true",
-        help="Save intent and summary output to outputs/session_<id>.json.",
+        help="Analyze and save output to outputs/session_<id>.json.",
     )
     parser.add_argument(
         "--outputs-dir",
@@ -88,7 +84,7 @@ def main() -> None:
     parser.add_argument(
         "--groq-model",
         default=None,
-        help="Groq model to use for intent parsing. Defaults to GROQ_MODEL or llama-3.1-8b-instant.",
+        help="Groq model to use for analysis. Defaults to GROQ_MODEL or llama-3.1-8b-instant.",
     )
     args = parser.parse_args()
     load_dotenv()
@@ -96,29 +92,29 @@ def main() -> None:
     text = transcribe_audio(Path(args.audio_file), args.model, args.language, args.initial_prompt)
     print(text)
 
-    if args.parse_intent or args.summarize or args.save:
-        intent_result = parse_intent(text, args.groq_model)
+    if args.analyze or args.save:
+        analysis = analyze_note(text, args.groq_model)
+        intent_result = analysis["intent"]
+        summary_result = analysis["summary"]
+
         print("Intent:")
-        print_intent(intent_result)
+        print_json(intent_result)
+        print("Summary:")
+        print_json(summary_result)
 
-        if args.summarize or args.save:
-            summary_result = summarize_note(text, intent_result, args.groq_model)
-            print("Summary:")
-            print_summary(summary_result)
-
-            if args.save:
-                outputs_dir = Path(args.outputs_dir)
-                session_id = create_session_id(outputs_dir)
-                session_note = build_session_note(
-                    session_id=session_id,
-                    audio_file=Path(args.audio_file),
-                    raw_transcript=text,
-                    intent=intent_result,
-                    summary=summary_result,
-                )
-                saved_path = save_session_note(outputs_dir, session_note)
-                print("Saved to:")
-                print(saved_path)
+        if args.save:
+            outputs_dir = Path(args.outputs_dir)
+            session_id = create_session_id(outputs_dir)
+            session_note = build_session_note(
+                session_id=session_id,
+                audio_file=Path(args.audio_file),
+                raw_transcript=text,
+                intent=intent_result,
+                summary=summary_result,
+            )
+            saved_path = save_session_note(outputs_dir, session_note)
+            print("Saved to:")
+            print(saved_path)
 
 
 if __name__ == "__main__":
