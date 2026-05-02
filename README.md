@@ -1,4 +1,4 @@
-# 🎙️ Voice Note AI
+# 🎙️ VoiceNote AI
 
 Voice Note AI is a multilingual AI voice-note assistant that records or accepts audio, transcribes speech using Whisper, extracts structured intent using Groq LLMs, summarizes the note, and saves the complete session as JSON.
 
