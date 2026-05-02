@@ -2,7 +2,8 @@ import json
 import os
 from typing import Any
 
-from groq import Groq
+from groq_client import get_groq_client
+from text_utils import contains_indic_text, extract_json, normalize_tanglish
 
 
 INTENT_SCHEMA_KEYS = [
@@ -182,57 +183,6 @@ Output:
 """
 
 
-def _extract_json(content: str) -> dict[str, Any]:
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        start = content.find("{")
-        end = content.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            raise
-        return json.loads(content[start : end + 1])
-
-
-def _contains_indic_text(text: str) -> bool:
-    return any(
-        "\u0900" <= char <= "\u097f"
-        or "\u0980" <= char <= "\u09ff"
-        or "\u0a00" <= char <= "\u0a7f"
-        or "\u0a80" <= char <= "\u0aff"
-        or "\u0b00" <= char <= "\u0b7f"
-        or "\u0b80" <= char <= "\u0bff"
-        or "\u0c00" <= char <= "\u0c7f"
-        or "\u0c80" <= char <= "\u0cff"
-        or "\u0d00" <= char <= "\u0d7f"
-        for char in text
-    )
-
-
-def normalize_tanglish(transcript: str) -> str:
-    replacements = {
-        "நீரஸ்தா": "nearby",
-        "நியர்ஸ்தா": "nearby",
-        "நியராச்சியாக": "near-ah",
-        "நியர்": "near",
-        "பஜ்செட்": "budget",
-        "பட்ஜெட்": "budget",
-        "ஃபிரிண்ட் லியர்": "friendly",
-        "ஃபிரெண்ட்லி": "friendly",
-        "பிரெண்ட்லி": "friendly",
-        "ஐஸ்க்ரிம் சாப்பிட்டு": "ice cream shop",
-        "ஐஸ்க்ரிம் ஷாப்": "ice cream shop",
-        "ஐஸ்கிரீம் ஷாப்": "ice cream shop",
-        "ஐஸ்க்ரீம் ஷாப்": "ice cream shop",
-    }
-
-    normalized = transcript
-    for source, target in replacements.items():
-        normalized = normalized.replace(source, target)
-    normalized = normalized.replace("budget friendly", "budget-friendly")
-    normalized = normalized.replace("budget-friendly", "budget-friendly")
-    return normalized
-
-
 def _detect_clear_tamil_emotion(transcript: str) -> str | None:
     if "கோவ" in transcript or "கோப" in transcript:
         return "angry"
@@ -243,7 +193,7 @@ def _detect_clear_tamil_emotion(transcript: str) -> str | None:
     return None
 
 
-def _normalize_intent(
+def normalize_intent_result(
     data: dict[str, Any],
     transcript: str,
     normalized_transcript: str | None = None,
@@ -251,13 +201,13 @@ def _normalize_intent(
     cleaned_transcript = normalized_transcript or transcript.strip()
     normalized = {key: data.get(key) for key in INTENT_SCHEMA_KEYS}
     normalized["raw_transcript"] = transcript
-    if _contains_indic_text(transcript):
+    if contains_indic_text(transcript):
         normalized["cleaned_transcript"] = cleaned_transcript
     else:
         normalized["cleaned_transcript"] = normalized["cleaned_transcript"] or transcript.strip()
     if not isinstance(normalized["context"], dict):
         normalized["context"] = {}
-    if _contains_indic_text(transcript) and cleaned_transcript != transcript:
+    if contains_indic_text(transcript) and cleaned_transcript != transcript:
         normalized["context"].setdefault("language_style", "tanglish")
         normalized["context"].setdefault("transcript_quality", "noisy_phonetic")
     tamil_emotion = _detect_clear_tamil_emotion(transcript)
@@ -276,11 +226,7 @@ def _normalize_intent(
 
 
 def parse_intent(transcript: str, model: str | None = None) -> dict[str, Any]:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("Missing GROQ_API_KEY. Add it to a .env file or export it in your shell.")
-
-    client = Groq(api_key=api_key)
+    client = get_groq_client()
     model_name = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
     normalized_transcript = normalize_tanglish(transcript)
     user_content = f"Transcript: {transcript}"
@@ -298,7 +244,7 @@ def parse_intent(transcript: str, model: str | None = None) -> dict[str, Any]:
             response_format={"type": "json_object"},
         )
         content = response.choices[0].message.content or "{}"
-        return _normalize_intent(_extract_json(content), transcript, normalized_transcript)
+        return normalize_intent_result(extract_json(content), transcript, normalized_transcript)
     except json.JSONDecodeError as exc:
         raise IntentParsingError("Groq returned intent output that was not valid JSON.") from exc
     except Exception as exc:

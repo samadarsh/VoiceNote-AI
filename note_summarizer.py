@@ -2,9 +2,8 @@ import json
 import os
 from typing import Any
 
-from groq import Groq
-
-from intent_parser import _extract_json, normalize_tanglish
+from groq_client import get_groq_client
+from text_utils import extract_json, normalize_tanglish
 
 
 SUMMARY_SCHEMA_KEYS = [
@@ -98,7 +97,7 @@ Use arrays for key_points, action_items, and important_entities.
 """
 
 
-def _normalize_summary(data: dict[str, Any], transcript: str) -> dict[str, Any]:
+def normalize_summary_result(data: dict[str, Any], transcript: str) -> dict[str, Any]:
     normalized = {key: data.get(key) for key in SUMMARY_SCHEMA_KEYS}
     normalized["cleaned_transcript"] = normalized["cleaned_transcript"] or transcript.strip()
     normalized["short_summary"] = normalized["short_summary"] or "No clear summary available."
@@ -115,11 +114,7 @@ def summarize_note(
     intent_data: dict[str, Any] | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("Missing GROQ_API_KEY. Add it to a .env file or export it in your shell.")
-
-    client = Groq(api_key=api_key)
+    client = get_groq_client()
     model_name = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
     normalized_transcript = normalize_tanglish(transcript)
 
@@ -140,7 +135,7 @@ def summarize_note(
             response_format={"type": "json_object"},
         )
         content = response.choices[0].message.content or "{}"
-        return _normalize_summary(_extract_json(content), transcript)
+        return normalize_summary_result(extract_json(content), transcript)
     except json.JSONDecodeError as exc:
         raise NoteSummaryError("Groq returned summary output that was not valid JSON.") from exc
     except Exception as exc:

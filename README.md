@@ -95,8 +95,11 @@ voice-note-ai/
 ├── transcribe_file.py        # Transcribe and process existing audio files
 ├── intent_parser.py          # Groq-powered structured intent extraction
 ├── note_summarizer.py        # Groq-powered summaries and action items
+├── voice_note_analyzer.py    # Combined intent + summary analysis for the app
+├── text_utils.py             # Shared JSON and multilingual text helpers
+├── groq_client.py            # Reused Groq client singleton
 ├── session_store.py          # Session ID and JSON saving helpers
-├── parse_intent.py           # Small CLI for parsing text intent
+├── parse_intent.py           # Thin CLI wrapper around intent_parser.py
 ├── requirements.txt          # Python dependencies
 ├── .env.example              # Example environment variables
 └── outputs/                  # Sample saved session JSON files
@@ -106,7 +109,7 @@ voice-note-ai/
 
 ## ✅ Prerequisites
 
-- Python 3.10 or newer
+- Python 3.10 or newer. Tested locally with Python 3.13.
 - FFmpeg, required by Whisper for audio processing
 - PortAudio, required by `sounddevice` for CLI microphone recording
 - A Groq API key

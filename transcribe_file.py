@@ -67,7 +67,7 @@ def main() -> None:
     parser.add_argument(
         "--save",
         action="store_true",
-        help="Save intent and summary output to outputs/session_###.json.",
+        help="Save intent and summary output to outputs/session_<id>.json.",
     )
     parser.add_argument(
         "--outputs-dir",

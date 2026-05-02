@@ -2,19 +2,12 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 
 def get_next_session_id(outputs_dir: Path) -> str:
     outputs_dir.mkdir(exist_ok=True)
-    session_numbers = []
-    for path in outputs_dir.glob("session_*.json"):
-        try:
-            session_numbers.append(int(path.stem.split("_")[1]))
-        except (IndexError, ValueError):
-            continue
-
-    next_number = max(session_numbers, default=0) + 1
-    return f"session_{next_number:03d}"
+    return f"session_{uuid4().hex[:8]}"
 
 
 def build_session_note(

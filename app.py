@@ -5,10 +5,9 @@ from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv
 
-from intent_parser import parse_intent
-from note_summarizer import summarize_note
 from session_store import build_session_note, get_next_session_id, save_session_note
 from transcribe_file import transcribe_audio
+from voice_note_analyzer import analyze_note
 
 
 def configure_api_key() -> None:
@@ -36,8 +35,9 @@ def process_audio(
 ) -> dict:
     try:
         transcript = transcribe_audio(audio_path, whisper_model, language)
-        intent = parse_intent(transcript, groq_model)
-        summary = summarize_note(transcript, intent, groq_model)
+        analysis = analyze_note(transcript, groq_model)
+        intent = analysis["intent"]
+        summary = analysis["summary"]
 
         outputs_dir = Path("outputs")
         session_id = get_next_session_id(outputs_dir)
