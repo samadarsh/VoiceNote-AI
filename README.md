@@ -16,16 +16,30 @@ You speak:
 
 > எனக்கு இப்ப மிகவும் கோபமாக வருகிறது
 
-The system produces:
+The system produces a structured note:
 
-- Transcript
-- Detected intent
-- Cleaned transcript
-- Short summary
-- Key points
-- Action items
-- Important entities
-- Saved JSON output
+```json
+{
+  "cleaned_transcript": "எனக்கு இப்ப மிகவும் கோபமாக வருகிறது",
+  "intent": {
+    "intent": "personal_note",
+    "subject": "feeling angry now",
+    "content_type": "note",
+    "language_detected": "Tamil",
+    "confidence": "high"
+  },
+  "short_summary": "The user is currently feeling very angry.",
+  "key_points": [
+    "The user is expressing strong anger right now."
+  ],
+  "action_items": [],
+  "important_entities": [
+    "anger"
+  ],
+  "language_detected": "Tamil",
+  "suggested_title": "Feeling Angry"
+}
+```
 
 ---
 
@@ -94,17 +108,20 @@ voice-note-ai/
 
 - Python 3.10 or newer
 - FFmpeg, required by Whisper for audio processing
+- PortAudio, required by `sounddevice` for CLI microphone recording
 - A Groq API key
 
-Install FFmpeg:
+Install system dependencies:
 
 ```bash
 # macOS
 brew install ffmpeg
+brew install portaudio
 
 # Ubuntu / Debian
 sudo apt update
 sudo apt install ffmpeg
+sudo apt install libportaudio2
 ```
 
 ---
@@ -170,3 +187,33 @@ Transcribe and process an existing audio file:
 ```bash
 python transcribe_file.py path/to/audio.wav --parse-intent --summarize --save
 ```
+
+---
+
+## ⚠️ Limitations
+
+- Whisper accuracy depends on audio quality, background noise, accent, and speech clarity.
+- Local Whisper models can be slow on CPU-only machines, especially for longer audio.
+- The app is optimized for spoken voice notes, not music transcription or multi-speaker diarization.
+- Session data is currently saved as JSON files in `outputs/`, not a database.
+
+---
+
+## 🛣️ Roadmap
+
+- Add SQLite storage for searchable note history.
+- Add asynchronous processing in Streamlit so long transcriptions do not block the UI.
+- Add speaker labels for meeting-style recordings.
+- Add export options for Markdown, PDF, or Notion-style notes.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome. Fork the repository, create a feature branch, make your changes, and open a pull request with a clear description of what changed and why.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
