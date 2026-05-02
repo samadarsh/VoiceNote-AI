@@ -2,7 +2,6 @@ import json
 import os
 from typing import Any
 
-from dotenv import load_dotenv
 from groq import Groq
 
 from intent_parser import _extract_json, normalize_tanglish
@@ -17,6 +16,10 @@ SUMMARY_SCHEMA_KEYS = [
     "language_detected",
     "suggested_title",
 ]
+
+
+class NoteSummaryError(RuntimeError):
+    """Raised when Groq cannot return a valid summary object."""
 
 
 SUMMARY_PROMPT = """
@@ -112,8 +115,6 @@ def summarize_note(
     intent_data: dict[str, Any] | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
-    load_dotenv()
-
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("Missing GROQ_API_KEY. Add it to a .env file or export it in your shell.")
@@ -128,17 +129,22 @@ def summarize_note(
         "intent": intent_data or {},
     }
 
-    response = client.chat.completions.create(
-        model=model_name,
-        messages=[
-            {"role": "system", "content": SUMMARY_PROMPT},
-            {"role": "user", "content": json.dumps(user_content, ensure_ascii=False)},
-        ],
-        temperature=0,
-        response_format={"type": "json_object"},
-    )
-    content = response.choices[0].message.content or "{}"
-    return _normalize_summary(_extract_json(content), transcript)
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": SUMMARY_PROMPT},
+                {"role": "user", "content": json.dumps(user_content, ensure_ascii=False)},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        content = response.choices[0].message.content or "{}"
+        return _normalize_summary(_extract_json(content), transcript)
+    except json.JSONDecodeError as exc:
+        raise NoteSummaryError("Groq returned summary output that was not valid JSON.") from exc
+    except Exception as exc:
+        raise NoteSummaryError(f"Groq summarization failed: {exc}") from exc
 
 
 def print_summary(summary_result: dict[str, Any]) -> None:

@@ -2,7 +2,6 @@ import json
 import os
 from typing import Any
 
-from dotenv import load_dotenv
 from groq import Groq
 
 
@@ -16,6 +15,10 @@ INTENT_SCHEMA_KEYS = [
     "raw_transcript",
     "cleaned_transcript",
 ]
+
+
+class IntentParsingError(RuntimeError):
+    """Raised when Groq cannot return a valid intent object."""
 
 
 SYSTEM_PROMPT = """
@@ -273,8 +276,6 @@ def _normalize_intent(
 
 
 def parse_intent(transcript: str, model: str | None = None) -> dict[str, Any]:
-    load_dotenv()
-
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("Missing GROQ_API_KEY. Add it to a .env file or export it in your shell.")
@@ -286,17 +287,22 @@ def parse_intent(transcript: str, model: str | None = None) -> dict[str, Any]:
     if normalized_transcript != transcript:
         user_content += f"\nNormalized hint: {normalized_transcript}"
 
-    response = client.chat.completions.create(
-        model=model_name,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-        temperature=0,
-        response_format={"type": "json_object"},
-    )
-    content = response.choices[0].message.content or "{}"
-    return _normalize_intent(_extract_json(content), transcript, normalized_transcript)
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        content = response.choices[0].message.content or "{}"
+        return _normalize_intent(_extract_json(content), transcript, normalized_transcript)
+    except json.JSONDecodeError as exc:
+        raise IntentParsingError("Groq returned intent output that was not valid JSON.") from exc
+    except Exception as exc:
+        raise IntentParsingError(f"Groq intent parsing failed: {exc}") from exc
 
 
 def print_intent(intent_result: dict[str, Any]) -> None:

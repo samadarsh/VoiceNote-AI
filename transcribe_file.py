@@ -2,18 +2,37 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import whisper
+from dotenv import load_dotenv
 
 from intent_parser import parse_intent, print_intent
 from note_summarizer import print_summary, summarize_note
 from session_store import build_session_note, get_next_session_id, save_session_note
 
 
-def transcribe_audio(audio_path: Path, model_name: str) -> str:
+DEFAULT_INITIAL_PROMPT = (
+    "This audio may contain English, Tamil, Tanglish, or mixed-language voice notes. "
+    "Common phrases include கோபமா வருது, பசிக்குது, சந்தோஷம், budget-friendly, "
+    "nearby, reminder, meeting note, and action items."
+)
+
+
+def transcribe_audio(
+    audio_path: Path,
+    model_name: str,
+    language: str | None = None,
+    initial_prompt: str | None = DEFAULT_INITIAL_PROMPT,
+) -> str:
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
     model = whisper.load_model(model_name)
-    result = model.transcribe(str(audio_path))
+    options = {}
+    if language:
+        options["language"] = language
+    if initial_prompt:
+        options["initial_prompt"] = initial_prompt
+
+    result = model.transcribe(str(audio_path), **options)
     return result["text"].strip()
 
 
@@ -24,6 +43,16 @@ def main() -> None:
         "--model",
         default="tiny",
         help="Whisper model to use. Default: tiny.",
+    )
+    parser.add_argument(
+        "--language",
+        default=None,
+        help="Optional Whisper language code, such as en or ta. Default: auto-detect.",
+    )
+    parser.add_argument(
+        "--initial-prompt",
+        default=DEFAULT_INITIAL_PROMPT,
+        help="Optional Whisper prompt used to bias transcription for mixed-language voice notes.",
     )
     parser.add_argument(
         "--parse-intent",
@@ -51,8 +80,9 @@ def main() -> None:
         help="Groq model to use for intent parsing. Defaults to GROQ_MODEL or llama-3.1-8b-instant.",
     )
     args = parser.parse_args()
+    load_dotenv()
 
-    text = transcribe_audio(Path(args.audio_file), args.model)
+    text = transcribe_audio(Path(args.audio_file), args.model, args.language, args.initial_prompt)
     print(text)
 
     if args.parse_intent or args.summarize or args.save:

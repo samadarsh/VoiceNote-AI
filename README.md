@@ -188,6 +188,12 @@ Transcribe and process an existing audio file:
 python transcribe_file.py path/to/audio.wav --parse-intent --summarize --save
 ```
 
+For Tamil-heavy audio, you can pass a Whisper language hint:
+
+```bash
+python transcribe_file.py path/to/audio.wav --language ta --parse-intent --summarize --save
+```
+
 ---
 
 ## ⚠️ Limitations

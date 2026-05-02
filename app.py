@@ -28,28 +28,36 @@ def save_uploaded_audio(uploaded_audio) -> Path:
         return Path(temp_file.name)
 
 
-def process_audio(audio_path: Path, whisper_model: str, groq_model: str | None) -> dict:
-    transcript = transcribe_audio(audio_path, whisper_model)
-    intent = parse_intent(transcript, groq_model)
-    summary = summarize_note(transcript, intent, groq_model)
+def process_audio(
+    audio_path: Path,
+    whisper_model: str,
+    groq_model: str | None,
+    language: str | None,
+) -> dict:
+    try:
+        transcript = transcribe_audio(audio_path, whisper_model, language)
+        intent = parse_intent(transcript, groq_model)
+        summary = summarize_note(transcript, intent, groq_model)
 
-    outputs_dir = Path("outputs")
-    session_id = get_next_session_id(outputs_dir)
-    session_note = build_session_note(
-        session_id=session_id,
-        audio_file=audio_path,
-        raw_transcript=transcript,
-        intent=intent,
-        summary=summary,
-    )
-    saved_path = save_session_note(outputs_dir, session_note)
+        outputs_dir = Path("outputs")
+        session_id = get_next_session_id(outputs_dir)
+        session_note = build_session_note(
+            session_id=session_id,
+            audio_file=audio_path,
+            raw_transcript=transcript,
+            intent=intent,
+            summary=summary,
+        )
+        saved_path = save_session_note(outputs_dir, session_note)
 
-    return {
-        "transcript": transcript,
-        "intent": intent,
-        "summary": summary,
-        "saved_path": saved_path,
-    }
+        return {
+            "transcript": transcript,
+            "intent": intent,
+            "summary": summary,
+            "saved_path": saved_path,
+        }
+    finally:
+        audio_path.unlink(missing_ok=True)
 
 
 def render_list(items: list[str], empty_text: str) -> None:
@@ -68,7 +76,9 @@ st.title("Voice Note AI")
 with st.sidebar:
     st.header("Settings")
     whisper_model = st.selectbox("Whisper model", ["tiny", "base", "small", "medium"], index=0)
+    language_label = st.selectbox("Language hint", ["Auto-detect", "Tamil", "English"], index=0)
     groq_model = st.text_input("Groq model", value=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"))
+    language = {"Auto-detect": None, "Tamil": "ta", "English": "en"}[language_label]
 
 audio_input = st.audio_input("Record a voice note")
 uploaded_file = st.file_uploader("Or upload an audio file", type=["wav", "mp3", "m4a", "ogg", "flac"])
@@ -85,7 +95,7 @@ if st.button("Process Voice Note", type="primary", disabled=audio_source is None
     with st.spinner("Transcribing and analyzing your voice note..."):
         try:
             audio_path = save_uploaded_audio(audio_source)
-            result = process_audio(audio_path, whisper_model, groq_model or None)
+            result = process_audio(audio_path, whisper_model, groq_model or None, language)
         except Exception as exc:
             st.error(f"Could not process this audio: {exc}")
             st.stop()

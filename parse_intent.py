@@ -1,4 +1,8 @@
+"""Thin CLI wrapper around intent_parser.py for parsing one transcript string."""
+
 from argparse import ArgumentParser
+
+from dotenv import load_dotenv
 
 from intent_parser import parse_intent, print_intent
 
@@ -12,6 +16,7 @@ def main() -> None:
         help="Groq model to use. Defaults to GROQ_MODEL or llama-3.1-8b-instant.",
     )
     args = parser.parse_args()
+    load_dotenv()
 
     intent_result = parse_intent(args.transcript, args.groq_model)
     print_intent(intent_result)

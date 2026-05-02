@@ -2,12 +2,13 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import sounddevice as sd
+from dotenv import load_dotenv
 from scipy.io.wavfile import write
 
 from intent_parser import parse_intent, print_intent
 from note_summarizer import summarize_note
 from session_store import build_session_note, get_next_session_id, save_session_note
-from transcribe_file import transcribe_audio
+from transcribe_file import DEFAULT_INITIAL_PROMPT, transcribe_audio
 
 
 def record_audio(output_path: Path, duration: float, sample_rate: int) -> None:
@@ -72,7 +73,7 @@ def process_recording(args: object) -> None:
     record_audio(audio_path, args.duration, args.sample_rate)
 
     print("Transcribing...")
-    transcript = transcribe_audio(audio_path, args.model)
+    transcript = transcribe_audio(audio_path, args.model, args.language, args.initial_prompt)
 
     if args.skip_llm:
         print("Transcript:")
@@ -122,6 +123,16 @@ def main() -> None:
         help="Whisper model to use. Default: tiny.",
     )
     parser.add_argument(
+        "--language",
+        default=None,
+        help="Optional Whisper language code, such as en or ta. Default: auto-detect.",
+    )
+    parser.add_argument(
+        "--initial-prompt",
+        default=DEFAULT_INITIAL_PROMPT,
+        help="Optional Whisper prompt used to bias transcription for mixed-language voice notes.",
+    )
+    parser.add_argument(
         "--groq-model",
         default=None,
         help="Groq model to use for intent parsing. Defaults to GROQ_MODEL or llama-3.1-8b-instant.",
@@ -147,6 +158,7 @@ def main() -> None:
         help="Process one recording and exit without loop prompt.",
     )
     args = parser.parse_args()
+    load_dotenv()
     args.skip_llm = args.skip_llm or args.skip_intent
 
     while True:
